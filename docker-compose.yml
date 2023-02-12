@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  lobby:
+    image: itzg/minecraft-server
+    container_name: lobby
+    ports:
+      - 25565:25565
+      - 25575:25575
+    environment:
+      MOTD: "Vanilla Minecraft, Chill Vibes Only"
+      EULA: "TRUE"
+      # ENABLE_RCON: "TRUE"
+      RCON_PASSWORD: Test
+      # RCON_PORT: 25575
+      TYPE: PAPER
+      VERSION: 1.19.2
+      MEMORY: 2G
+    restart: always
+    volumes:
+      - ./data/lobby:/data
+      - ./plugins/lobby:/plugins
+    healthcheck:
+      test: mc-health
+      start_period: 1m
+      interval: 5s
+      retries: 20
+
+  rcon:
+    image: itzg/rcon
+    container_name: rcon
+    ports:
+      - 4326:4326
+      - 4327:4327
+    environment:
+      RWA_USERNAME: admin
+      RWA_PASSWORD: admin
+      RWA_ADMIN: "TRUE"
+      RWA_RCON_HOST: lobby
+      RWA_RCON_PASSWORD: Test
+    volumes:
+      - ./data/rcon:/opt/rcon-web-admin/db
+    depends_on:
+      - lobby
+
+  proxy:
+    image: itzg/bungeecord
+    container_name: proxy
+    environment:
+      TYPE: WATERFALL
+    volumes:
+      - ./plugins/proxy:/plugins
+      - ./data/proxy:/config
+    depends_on:
+      - lobby
+
+  lobby_backup:
+    image: itzg/mc-backup
+    container_name: lobby_backup
+    environment:
+      BACKUP_INTERVAL: "2h"
+      # instead of network_mode below, could declare RCON_HOST
+      RCON_HOST: lobby
+    volumes:
+    # mount the same volume used by server, but read-only
+    - ./data/lobby:/data:ro
+    # use a host attached directory so that it in turn can be backed up
+    # to external/cloud storage
+    - ./mc-backups:/backups
+    # share network namespace with server to simplify rcon access
+    # network_mode: "service:mc"
+    depends_on:
+      - lobby
+
+# volumes:
+#   lobby_data:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       device: ./data/lobby
+#       o: bind
+#   lobby_plugins:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       device: ./plugins/lobby
+#       o: bind
+#   proxy_data:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       device: ./data/proxy
+#       o: bind
+#   proxy_plugins:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       device: ./plugins/proxy
+#       o: bind
+#   rcon:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       device: ./data/rcon
+#       o: bind
